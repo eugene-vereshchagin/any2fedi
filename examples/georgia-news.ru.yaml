@@ -1,0 +1,41 @@
+# Пример: русскоязычная лента новостей о Грузии из трёх Telegram-каналов
+# с русскими формулировками в постах.
+
+instance: https://social.example.com
+state_db: /srv/any2fedi/state/state.db
+post_delay_seconds: 3
+
+texts:
+  template: "{text}\n\n{forwarded}\n\n{media_note}\n\n{footer}\n\n{hashtags}"
+  footer: "— {source}: {url}"
+  forwarded: "↪ переслано из: {name}"
+  unsupported_media: "🎬 видео / вложение — в оригинале"
+  truncated: "… (полностью — в оригинале)"
+  rss_title: "**{title}**"
+
+defaults:
+  visibility: public
+  language: ru
+  content_type: text/markdown
+  max_media: 10
+  max_media_bytes: 10485760
+  max_chars: 5000
+  backfill: 0
+  video_thumbs: true
+  skip_textless_video: true
+
+accounts:
+  georgia_news:
+    token: "PASTE_TOKEN_FROM_get_token.py"
+    hashtags: ["#Грузия"]
+    sources:
+      - type: telegram
+        channel: ProGeorgian
+        label: "Про Грузия"
+      - type: telegram
+        channel: NGnewsgeorgia
+        label: "NEWSGEORGIA"
+      - type: telegram
+        channel: fa_huu
+        label: "Fa_huu"
+        hashtags: ["#Грузия", "#туры"]

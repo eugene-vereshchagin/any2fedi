@@ -1,0 +1,8 @@
+# local config holds access tokens — never commit it
+config.yaml
+state/
+*.db
+*.lock
+__pycache__/
+*.pyc
+.venv/

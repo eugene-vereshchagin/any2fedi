@@ -1,0 +1,68 @@
+# any2fedi configuration.
+# Copy to /srv/any2fedi/config.yaml and `chmod 600` it: it holds access tokens.
+
+instance: https://social.example.com   # your fediverse server (Mastodon API)
+state_db: /srv/any2fedi/state/state.db
+post_delay_seconds: 3                  # pause between posts, be nice to the server
+# user_agent: "any2fedi/1.0"
+
+# ---------------------------------------------------------------------------
+# Texts: every piece of wording that ends up in a post.
+# Can be overridden per account (accounts.<name>.texts) and per source
+# (accounts.<name>.sources[].texts) — only the keys you set are replaced.
+# ---------------------------------------------------------------------------
+texts:
+  # Layout of a post. Empty blocks disappear together with their blank lines.
+  # Placeholders: {text} {forwarded} {media_note} {footer} {hashtags}
+  template: "{text}\n\n{forwarded}\n\n{media_note}\n\n{footer}\n\n{hashtags}"
+  footer: "— {source}: {url}"                       # {source} {url}
+  forwarded: "↪ forwarded from: {name}"             # {name}
+  unsupported_media: "🎬 video / attachment — see the original"
+  truncated: "…"                                    # appended when a post is cut to max_chars
+  rss_title: "**{title}**"                          # {title}
+
+# ---------------------------------------------------------------------------
+# Defaults for every account. Any account can override any key.
+# ---------------------------------------------------------------------------
+defaults:
+  visibility: public           # public | unlisted | private
+  language: en                 # ISO 639-1 code of the posts
+  content_type: text/markdown  # GoToSocial/Akkoma/Pleroma understand Markdown;
+                               # for vanilla Mastodon set "" (plain text)
+  max_media: 4                 # attachment limit of your server
+  max_media_bytes: 10485760    # 10 MB; bigger images are skipped
+  max_chars: 5000              # must not exceed the server's post length limit
+  backfill: 0                  # for a NEW source: how many latest posts to publish (0 = none)
+  # Telegram-only options (can also be set per account or per source):
+  video_thumbs: true           # attach the video preview frame as an image
+  skip_textless_video: true    # drop posts that are just a video/file without a caption
+
+# ---------------------------------------------------------------------------
+# Accounts. The key is an internal name used in logs and in the state db:
+# don't rename it later, or the account is treated as new.
+# ---------------------------------------------------------------------------
+accounts:
+
+  example_news:
+    token: "PASTE_TOKEN_FROM_get_token.py"
+    hashtags: ["#news"]        # appended to every post of this account
+    sources:
+      - type: telegram
+        channel: some_channel  # public channel username (with or without @, or a t.me link)
+        label: "Some Channel"  # shown in the footer instead of the username
+      - type: telegram
+        channel: another_channel
+        hashtags: ["#news", "#local"]     # per-source override
+        texts:
+          footer: "📰 {source}: {url}"     # per-source wording override
+
+  example_blog:
+    enabled: false             # temporarily switch an account off
+    token: "..."
+    visibility: unlisted
+    backfill: 2
+    sources:
+      - type: rss              # RSS 2.0 or Atom
+        url: https://example.com/feed.xml
+        label: "Example blog"
+        title_only: false      # true = only the title and the link, no body

@@ -1,0 +1,19 @@
+[Unit]
+Description=any2fedi: mirror Telegram channels / RSS into fediverse accounts
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=any2fedi
+Group=any2fedi
+WorkingDirectory=/srv/any2fedi
+ExecStart=/usr/bin/python3 /srv/any2fedi/any2fedi.py -c /srv/any2fedi/config.yaml
+TimeoutStartSec=15min
+# hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/any2fedi/state
+PrivateTmp=yes
+MemoryMax=200M
