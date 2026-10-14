@@ -94,6 +94,7 @@ class Item:
     has_unsupported_media: bool = False             # video, files, polls...
     forwarded_from: str | None = None
     sort_key: tuple = ()
+    raw_html: str = ""                 # original markup, for --show-html
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +121,18 @@ def html_to_markdown(node: Tag | None) -> str:
     def inner(t: Tag) -> str:
         return "".join(conv(c) for c in t.children)
 
+    active: set[str] = set()
+
     def wrap(t: Tag, mark: str) -> str:
+        if mark in active:                 # <b> inside <b>: markers would cancel out
+            return inner(t)
+        active.add(mark)
+        try:
+            return _wrap(t, mark)
+        finally:
+            active.discard(mark)
+
+    def _wrap(t: Tag, mark: str) -> str:
         # Markdown emphasis can't span lines and can't start/end with a space:
         # wrap every line separately and keep its whitespace outside the markers.
         out = []
@@ -297,7 +309,8 @@ class TelegramSource(Source):
                         media.append(m.group(1))
 
             unsupported = bool(msg.select(self.UNSUPPORTED))
-            text = html_to_markdown(msg.select_one(".tgme_widget_message_text"))
+            text_node = msg.select_one(".tgme_widget_message_text")
+            text = html_to_markdown(text_node)
             fwd = msg.select_one(".tgme_widget_message_forwarded_from_name")
 
             if not text and not media and not unsupported:
@@ -313,6 +326,7 @@ class TelegramSource(Source):
                 has_unsupported_media=unsupported,
                 forwarded_from=fwd.get_text(strip=True) if fwd else None,
                 sort_key=(msg_id,),
+                raw_html=text_node.decode() if text_node else "",
             ))
         items.sort(key=lambda i: i.sort_key)
         return items
@@ -604,6 +618,8 @@ def _run(cfg, state, dry_run, only_account, fedi_factory) -> None:
                 for u in it.media[: int(acc.get("max_media", 4))]:
                     print(f"  image: {u}")
                 print(text + "\n")
+                if cfg.get("_show_html") and it.raw_html:
+                    print("----- raw html -----\n" + it.raw_html + "\n")
             continue
 
         fedi = fedi_factory(cfg["instance"], acc["token"], session,
@@ -653,6 +669,8 @@ def main(argv=None) -> int:
     ap.add_argument("--dry-run", action="store_true",
                     help="fetch and print what would be posted; post nothing, touch no state")
     ap.add_argument("--account", help="process only this account")
+    ap.add_argument("--show-html", action="store_true",
+                    help="with --dry-run: also print the original HTML of each post")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     a = ap.parse_args(argv)
@@ -661,6 +679,7 @@ def main(argv=None) -> int:
 
     cfg = yaml.safe_load(Path(a.config).read_text(encoding="utf-8")) or {}
     if a.dry_run:
+        cfg["_show_html"] = a.show_html
         run(cfg, dry_run=True, only_account=a.account)
         return 0
 
