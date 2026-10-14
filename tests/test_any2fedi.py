@@ -52,6 +52,17 @@ class TelegramParserTest(unittest.TestCase):
         self.assertIn("108", items)
         self.assertEqual(items["103"].media, [])
 
+    def test_broken_emoji_closing_tag(self):
+        # real markup from t.me/s/ProGeorgian: flag emoji with a broken </b>
+        page = ('<div class="tgme_widget_message" data-post="c/1"><div class="tgme_widget_message_text">'
+                '<i class="emoji" style="x"><b>⚽</b></i><i class="emoji" style="x"><b>🇬🇪b></i> '
+                '<b>Хвича приехал.</b><br/>Текст дальше.</div></div>'
+                '<div class="tgme_widget_message" data-post="c/2"><div class="tgme_widget_message_text">'
+                'Второй пост</div></div>')
+        items = {i.uid: i for i in tg().parse(page)}
+        self.assertEqual(items["1"].text, "⚽🇬🇪 **Хвича приехал.**\nТекст дальше.")
+        self.assertEqual(items["2"].text, "Второй пост")
+
     def test_channel_name_forms(self):
         for raw in ("@testchan", "https://t.me/testchan", "t.me/s/testchan/"):
             self.assertEqual(a2f.TelegramSource({"channel": raw}, None).channel, "testchan")

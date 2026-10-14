@@ -287,7 +287,14 @@ class TelegramSource(Source):
             raise RuntimeError(f"@{self.channel} has no public web preview")
         return self.parse(r.text)
 
+    # Telegram's web preview emits broken closing tags for some emoji
+    # (seen on flags): <b>🇬🇪b></i> instead of <b>🇬🇪</b></i>. The unclosed <b>
+    # then swallows the rest of the post and even leaks into the next posts.
+    # A literal "b></i>" can't occur in text (Telegram escapes ">" as &gt;).
+    BROKEN_CLOSE = re.compile(r"(?<![</])([bius])></(i|b|u|s|a)>")
+
     def parse(self, page: str) -> list[Item]:
+        page = self.BROKEN_CLOSE.sub(r"</\1></\2>", page)
         soup = BeautifulSoup(page, "html.parser")
         items: list[Item] = []
         for msg in soup.select("div.tgme_widget_message[data-post]"):
