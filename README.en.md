@@ -102,6 +102,22 @@ texts:
 
 Any key can be overridden in `accounts.<name>.texts` or `sources[].texts`. Only the keys you set are replaced; the rest are inherited. Precedence: built-in defaults → `texts` → account → source.
 
+## Cleaning posts
+
+Two options, both lists of case-insensitive regular expressions. They are applied to the text after it has been converted to Markdown, and can be set in `defaults`, per account, or per source.
+
+- `strip_lines` — drop every line that matches. Handy for channel signatures such as "@channel" or "📲 Subscribe".
+- `skip_if` — don't publish a post at all if anything in its text matches. Useful for ads marked `#ad`, `#sponsored` and the like.
+
+```yaml
+      - type: telegram
+        channel: somechannel
+        strip_lines: ["^@somechannel$", "^📲"]
+        skip_if: ["#ad"]
+```
+
+`--dry-run` is the easiest way to test the rules: it shows posts after cleaning.
+
 ## Extending
 
 - **Another source for an account**: add a line to `sources`.

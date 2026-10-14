@@ -36,6 +36,10 @@ defaults:
   # Telegram-only options (can also be set per account or per source):
   video_thumbs: true           # attach the video preview frame as an image
   skip_textless_video: true    # drop posts that are just a video/file without a caption
+  # Any source type (can also be set per account or per source).
+  # Lists of regexes, case-insensitive, matched against the Markdown text:
+  skip_if: []                  # drop the whole post if any matches, e.g. ["#ad", "#sponsored"]
+  strip_lines: []              # drop matching lines, e.g. channel signatures: ["^@mychannel$"]
 
 # ---------------------------------------------------------------------------
 # Accounts. The key is an internal name used in logs and in the state db:

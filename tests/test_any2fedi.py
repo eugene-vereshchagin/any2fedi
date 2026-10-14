@@ -118,6 +118,36 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(t["forwarded"], a2f.DEFAULT_TEXTS["forwarded"])
 
 
+class MarkdownTest(unittest.TestCase):
+    def md(self, html):
+        from bs4 import BeautifulSoup
+        return a2f.html_to_markdown(BeautifulSoup(f"<div>{html}</div>", "html.parser").div)
+
+    def test_telegram_emoji_is_plain(self):
+        self.assertEqual(self.md('<i class="emoji" style="x"><b>🎵</b></i> hi'), "🎵 hi")
+
+    def test_emphasis_whitespace_outside(self):
+        self.assertEqual(self.md("<b>Word </b>next"), "**Word** next")
+
+    def test_emphasis_per_line(self):
+        self.assertEqual(self.md("<b>one<br/><br/>two</b>"), "**one**\n\n**two**")
+
+    def test_escaping(self):
+        self.assertEqual(self.md("* star 2*2 _x_ a_b `c`"), "\\* star 2\\*2 \\_x\\_ a_b \\`c\\`")
+
+
+class FilterTest(unittest.TestCase):
+    def test_strip_lines_and_skip_if(self):
+        src = a2f.TelegramSource({"channel": "c",
+                                  "strip_lines": [r"^📲", r"^@chan$"],
+                                  "skip_if": [r"#реклама"]}, None)
+        items = [a2f.Item(uid="1", url="u", text="News\n\n📲 [Телеграм](x) / more\n@chan"),
+                 a2f.Item(uid="2", url="u", text="Buy now #РЕКЛАМА")]
+        out = src.filter(items)
+        self.assertEqual([i.uid for i in out], ["1"])
+        self.assertEqual(out[0].text, "News")
+
+
 class FakeFedi:
     posts = []
 

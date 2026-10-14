@@ -68,7 +68,8 @@ DEFAULT_TEXTS = {
 }
 
 # Options that may be set at defaults / account level and inherited by sources.
-SOURCE_INHERITED = ("video_thumbs", "skip_textless_video", "title_only")
+SOURCE_INHERITED = ("video_thumbs", "skip_textless_video", "title_only",
+                    "strip_lines", "skip_if")
 
 
 def merged_texts(*layers: dict | None) -> dict:
@@ -99,6 +100,19 @@ class Item:
 # HTML -> Markdown (covers what Telegram and typical feeds use)
 # ---------------------------------------------------------------------------
 
+_MD_ESCAPE = [
+    (re.compile(r"([*`\\])"), r"\\\1"),            # * ` and backslash: always
+    (re.compile(r"(?<!\w)_|_(?!\w)"), r"\\_"),      # _ only at word edges (keeps URLs intact)
+    (re.compile(r"~~"), r"\\~\\~"),
+]
+
+
+def md_escape(text: str) -> str:
+    for rx, repl in _MD_ESCAPE:
+        text = rx.sub(repl, text)
+    return text
+
+
 def html_to_markdown(node: Tag | None) -> str:
     if node is None:
         return ""
@@ -107,12 +121,22 @@ def html_to_markdown(node: Tag | None) -> str:
         return "".join(conv(c) for c in t.children)
 
     def wrap(t: Tag, mark: str) -> str:
-        s = inner(t)
-        return f"{mark}{s}{mark}" if s.strip() else s
+        # Markdown emphasis can't span lines and can't start/end with a space:
+        # wrap every line separately and keep its whitespace outside the markers.
+        out = []
+        for line in inner(t).split("\n"):
+            core = line.strip()
+            if not core:
+                out.append(line)
+                continue
+            lead = line[: len(line) - len(line.lstrip())]
+            trail = line[len(line.rstrip()):]
+            out.append(f"{lead}{mark}{core}{mark}{trail}")
+        return "\n".join(out)
 
     def conv(n) -> str:
         if isinstance(n, NavigableString):
-            return str(n)
+            return md_escape(str(n))
         if not isinstance(n, Tag):
             return ""
         name = n.name
@@ -120,6 +144,8 @@ def html_to_markdown(node: Tag | None) -> str:
             return "\n"
         if name in ("b", "strong"):
             return wrap(n, "**")
+        if name == "i" and "emoji" in (n.get("class") or []):
+            return n.get_text()                        # telegram emoji wrapper
         if name in ("i", "em"):
             return wrap(n, "*")
         if name in ("s", "del", "strike"):
@@ -183,6 +209,28 @@ class Source:
     def is_newer(self, uid: str, last_uid: str | None) -> bool:
         """Cheap pre-filter; the `posted` table is the real dedup."""
         return True
+
+    def _regexes(self, key: str) -> list[re.Pattern]:
+        cache = self.__dict__.setdefault("_rx", {})
+        if key not in cache:
+            cache[key] = [re.compile(p, re.I | re.M) for p in (self.cfg.get(key) or [])]
+        return cache[key]
+
+    def filter(self, items: list[Item]) -> list[Item]:
+        """Apply `skip_if` (drop whole posts) and `strip_lines` (drop lines) from config.
+        Both are lists of regexes; matched against the Markdown text, case-insensitive."""
+        skip, strip = self._regexes("skip_if"), self._regexes("strip_lines")
+        out = []
+        for it in items:
+            if any(rx.search(it.text) for rx in skip):
+                log.debug("%s #%s skipped by skip_if", self.key, it.uid)
+                continue
+            if strip:
+                lines = [l for l in it.text.split("\n")
+                         if not any(rx.search(l.strip()) for rx in strip)]
+                it.text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+            out.append(it)
+        return out
 
     # Telegram ids grow monotonically, so a cursor is meaningful there.
     uses_cursor = False
@@ -526,7 +574,7 @@ def _run(cfg, state, dry_run, only_account, fedi_factory) -> None:
 
         for src in build_sources(acc_name, acc, global_texts, session):
             try:
-                items = src.fetch()
+                items = src.filter(src.fetch())
             except Exception as e:
                 log.error("[%s] %s fetch failed: %s", acc_name, src.key, e)
                 continue

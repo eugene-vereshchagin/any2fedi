@@ -1,6 +1,3 @@
-# Пример: русскоязычная лента новостей о Грузии из трёх Telegram-каналов
-# с русскими формулировками в постах.
-
 instance: https://social.example.com
 state_db: /srv/any2fedi/state/state.db
 post_delay_seconds: 3
@@ -23,19 +20,22 @@ defaults:
   backfill: 0
   video_thumbs: true
   skip_textless_video: true
+  # skip posts whose text matches any of these regexes (case-insensitive)
+  skip_if: ["#реклама", "#промо", "^реклама\\.?$"]
 
 accounts:
+
   georgia_news:
     token: "PASTE_TOKEN_FROM_get_token.py"
-    hashtags: ["#Грузия"]
+    hashtags: ["#georgia_news"]
     sources:
+
       - type: telegram
         channel: ProGeorgian
-        label: "Про Грузия"
+        label: "Про Грузию"
+        strip_lines: ["^📲"]               # "📲 Телеграм / Предложить новость"
+
       - type: telegram
         channel: NGnewsgeorgia
         label: "NEWSGEORGIA"
-      - type: telegram
-        channel: fa_huu
-        label: "Fa_huu"
-        hashtags: ["#Грузия", "#туры"]
+        strip_lines: ["^@NGnewsgeorgia$"]  # channel signature at the end
